@@ -129,12 +129,21 @@ func (v *VMController) Start() {
 // @Failure 500 Failed to stop VM.
 // @router /stop [POST]
 func (v *VMController) Stop() {
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		ResponseNoKubeVirt(v)
+		return
+	}
+
 	var jsonReq JsonRequestVMName
 	json.Unmarshal(v.Ctx.Input.RequestBody, &jsonReq)
-	if jsonReq.Name == "1" {
-		v.Data["json"] = JsonResponseBasic{200, jsonReq.Name + " stop success."}
+	vmName := jsonReq.Name
+
+	err := (*virtClient).VirtualMachine(*namespace).Stop(vmName)
+	if err != nil {
+		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + vmName + "."}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + jsonReq.Name + "."}
+		v.Data["json"] = JsonResponseBasic{200, vmName + " stop success."}
 	}
 	v.ServeJSON()
 }
