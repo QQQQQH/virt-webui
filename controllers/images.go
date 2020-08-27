@@ -2,10 +2,40 @@ package controllers
 
 import (
 	"encoding/json"
+	"log"
 	"virt-webui/models"
 
 	"github.com/astaxie/beego"
+	"github.com/spf13/pflag"
+	"kubevirt.io/client-go/kubecli"
 )
+
+func ResponseNoKubeVirt(v *VMController) {
+	v.Data["json"] = JsonResponseBasic{500, "KubeVirt not avaliable."}
+	v.ServeJSON()
+	return
+}
+
+func GetVirtClient() (bool, *string, *kubecli.KubevirtClient) {
+	// kubecli.DefaultClientConfig() prepares config using kubeconfig.
+	// typically, you need to set env variable, KUBECONFIG=<path-to-kubeconfig>/.kubeconfig
+	clientConfig := kubecli.DefaultClientConfig(&pflag.FlagSet{})
+
+	// retrive default namespace.
+	namespace, _, err := clientConfig.Namespace()
+	if err != nil {
+		log.Fatalf("error in namespace : %v\n", err)
+		return false, nil, nil
+	}
+
+	// get the kubevirt client, using which kubevirt resources can be managed.
+	virtClient, err := kubecli.GetKubevirtClientFromClientConfig(clientConfig)
+	if err != nil {
+		log.Fatalf("cannot obtain KubeVirt client: %v\n", err)
+		return false, nil, nil
+	}
+	return true, &namespace, &virtClient
+}
 
 // Operations about image
 type ImageController struct {
