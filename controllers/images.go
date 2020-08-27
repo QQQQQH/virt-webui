@@ -2,16 +2,21 @@ package controllers
 
 import (
 	"encoding/json"
+	"flag"
 	"log"
+	"path/filepath"
 	"virt-webui/models"
 
 	"github.com/astaxie/beego"
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"kubevirt.io/client-go/kubecli"
 )
 
-func ResponseNoKubeVirt(v *VMController) {
-	v.Data["json"] = JsonResponseBasic{500, "KubeVirt not avaliable."}
+func ResponseNotAvaliable(v *VMController) {
+	v.Data["json"] = JsonResponseBasic{500, "Not avaliable."}
 	v.ServeJSON()
 	return
 }
@@ -24,7 +29,7 @@ func GetVirtClient() (bool, *string, *kubecli.KubevirtClient) {
 	// retrive default namespace.
 	namespace, _, err := clientConfig.Namespace()
 	if err != nil {
-		log.Fatalf("error in namespace : %v\n", err)
+		log.Fatalf("error in KubeVirt namespace : %v\n", err)
 		return false, nil, nil
 	}
 
@@ -35,6 +40,33 @@ func GetVirtClient() (bool, *string, *kubecli.KubevirtClient) {
 		return false, nil, nil
 	}
 	return true, &namespace, &virtClient
+}
+
+var kubeconfig *string
+
+func GetDynamicClient() (bool, *string, *dynamic.Interface) {
+	if kubeconfig == nil {
+		if home := homedir.HomeDir(); home != "" {
+			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		} else {
+			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		}
+		flag.Parse()
+	}
+
+	namespace := "default"
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		log.Fatalf("error in dynamic config : %v\n", err)
+		return false, nil, nil
+	}
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("error in dynamic client : %v\n", err)
+		return false, nil, nil
+	}
+	return true, &namespace, &client
 }
 
 // Operations about image

@@ -7,6 +7,7 @@ import (
 
 	"github.com/astaxie/beego"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	v1 "kubevirt.io/client-go/api/v1"
 )
 
@@ -27,7 +28,7 @@ type JsonRequestVMName struct {
 func (v *VMController) GetAll() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNoKubeVirt(v)
+		ResponseNotAvaliable(v)
 		return
 	}
 
@@ -106,7 +107,7 @@ type JsonResponseGetVMSuccessVMInfo struct {
 func (v *VMController) Start() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNoKubeVirt(v)
+		ResponseNotAvaliable(v)
 		return
 	}
 
@@ -132,7 +133,7 @@ func (v *VMController) Start() {
 func (v *VMController) Stop() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNoKubeVirt(v)
+		ResponseNotAvaliable(v)
 		return
 	}
 
@@ -189,7 +190,7 @@ type JsonResponseCreateVM struct {
 func (v *VMController) Put() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNoKubeVirt(v)
+		ResponseNotAvaliable(v)
 		return
 	}
 
@@ -214,10 +215,25 @@ func (v *VMController) Put() {
 // @Failure 500 Failed to delete VM.
 // @router /:VMName [delete]
 func (v *VMController) Delete() {
+	ok, namespace, dynamicClient := GetDynamicClient()
+	if !ok {
+		ResponseNotAvaliable(v)
+		return
+	}
+
 	vmName := v.Ctx.Input.Param(":VMName")
-	if vmName == "1" {
+	vmRes := schema.GroupVersionResource{Group: "kubevirt.io",
+		Version: "v1alpha3", Resource: "virtualmachines"}
+	deletePolicy := k8smetav1.DeletePropagationForeground
+	deleteOptions := k8smetav1.DeleteOptions{
+		PropagationPolicy: &deletePolicy,
+	}
+	err := (*dynamicClient).Resource(vmRes).Namespace(*namespace).Delete(vmName, &deleteOptions)
+
+	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " delete success."}
 	} else {
+		v.Ctx.Output.SetStatus(500)
 		v.Data["json"] = JsonResponseBasic{500, "Failed to delete " + vmName + "."}
 	}
 	v.ServeJSON()
