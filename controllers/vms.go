@@ -7,6 +7,7 @@ import (
 
 	"github.com/astaxie/beego"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "kubevirt.io/client-go/api/v1"
 )
 
 // Operations about virtual machine
@@ -114,10 +115,10 @@ func (v *VMController) Start() {
 	vmName := jsonReq.Name
 
 	err := (*virtClient).VirtualMachine(*namespace).Start(vmName)
-	if err != nil {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to start " + vmName + "."}
-	} else {
+	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " start success."}
+	} else {
+		v.Data["json"] = JsonResponseBasic{500, "Failed to start " + vmName + "."}
 	}
 	v.ServeJSON()
 }
@@ -140,10 +141,10 @@ func (v *VMController) Stop() {
 	vmName := jsonReq.Name
 
 	err := (*virtClient).VirtualMachine(*namespace).Stop(vmName)
-	if err != nil {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + vmName + "."}
-	} else {
+	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " stop success."}
+	} else {
+		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + vmName + "."}
 	}
 	v.ServeJSON()
 }
@@ -186,11 +187,19 @@ type JsonResponseCreateVM struct {
 // @Failure 500 Failed to rename VM.
 // @router /:VMName [put]
 func (v *VMController) Put() {
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		ResponseNoKubeVirt(v)
+		return
+	}
+
 	vmName := v.Ctx.Input.Param(":VMName")
 	var jsonReq JsonRequestRename
 	json.Unmarshal(v.Ctx.Input.RequestBody, &jsonReq)
 	newName := jsonReq.NewName
-	if vmName == "1" {
+
+	err := (*virtClient).VirtualMachine(*namespace).Rename(vmName, &v1.RenameOptions{NewName: newName})
+	if err == nil {
 		v.Data["json"] = JsonResponseRenameSuccess{200, "Rename " + vmName + " to " + newName + " success.", newName}
 	} else {
 		v.Data["json"] = JsonResponseBasic{500, "Failed to rename " + vmName + " to " + newName + "."}
