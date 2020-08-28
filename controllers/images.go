@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"path/filepath"
+	imageupload "virt-webui/controllers/imageUpload"
 	"virt-webui/models"
 
 	"github.com/astaxie/beego"
@@ -130,11 +131,22 @@ type JsonResponseListImageSuccess struct {
 func (i *ImageController) Post() {
 	var jsonReq JsonRequestUploadImage
 	json.Unmarshal(i.Ctx.Input.RequestBody, &jsonReq)
-	if jsonReq.Name == "1" {
-		i.Data["json"] = JsonResponseUploadImageSuccess{200, jsonReq.Name + " upload success.", JsonRequestUploadImage{jsonReq.Name, jsonReq.FilePath}}
+
+	insecure := true
+	uploadProxyUrl := "https://192.168.39.22:31001"
+	name := jsonReq.Name
+	size := "1G"
+	imagePath := jsonReq.FilePath
+	accessMode := "ReadOnlyMany"
+	uploadPodWaitSecs := uint(240)
+
+	err := imageupload.UploadImage(insecure, uploadProxyUrl, name, size, imagePath, accessMode, uploadPodWaitSecs)
+
+	if err == nil {
+		i.Data["json"] = JsonResponseUploadImageSuccess{200, name + " upload success.", JsonRequestUploadImage{name, imagePath}}
 
 	} else {
-		i.Data["json"] = JsonResponseBasic{500, "Failed to upload " + jsonReq.Name + "."}
+		i.Data["json"] = JsonResponseBasic{500, "Failed to upload " + name + ". " + err.Error()}
 	}
 	i.ServeJSON()
 }
