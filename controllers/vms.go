@@ -28,7 +28,7 @@ type JsonRequestVMName struct {
 func (v *VMController) GetAll() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -107,7 +107,7 @@ type JsonResponseGetVMSuccessVMInfo struct {
 func (v *VMController) Start() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -133,7 +133,7 @@ func (v *VMController) Start() {
 func (v *VMController) Stop() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -190,7 +190,7 @@ type JsonResponseCreateVM struct {
 func (v *VMController) Put() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -217,7 +217,7 @@ func (v *VMController) Put() {
 func (v *VMController) Delete() {
 	ok, namespace, dynamicClient := GetDynamicClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 

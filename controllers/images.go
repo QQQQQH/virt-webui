@@ -9,13 +9,21 @@ import (
 
 	"github.com/astaxie/beego"
 	"github.com/spf13/pflag"
+	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"kubevirt.io/client-go/kubecli"
 )
 
-func ResponseNotAvaliable(v *VMController) {
+func (i *ImageController) ResponseNotAvaliable() {
+	i.Data["json"] = JsonResponseBasic{500, "Not avaliable."}
+	i.ServeJSON()
+	return
+}
+
+func (v *VMController) ResponseNotAvaliable() {
 	v.Data["json"] = JsonResponseBasic{500, "Not avaliable."}
 	v.ServeJSON()
 	return
@@ -85,10 +93,25 @@ type JsonResponseBasic struct {
 // @Failure 500 Failed to list images.
 // @router / [get]
 func (i *ImageController) GetAll() {
-	var images []models.Image
-	images = append(images, models.Image{"image1"})
-	images = append(images, models.Image{"image2"})
-	i.Data["json"] = JsonResponseListImageSuccess{200, "Images get success.", images}
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		i.ResponseNotAvaliable()
+		return
+	}
+	imgList, err := (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).List(k8smetav1.ListOptions{})
+
+	if err != nil {
+		log.Fatalf("cannot obtain KubeVirt image list: %v\n", err)
+		i.ServeJSON()
+		return
+	}
+
+	var imgs []models.Image
+	for _, img := range imgList.Items {
+		imgs = append(imgs, models.Image{img.Name})
+	}
+
+	i.Data["json"] = JsonResponseListImageSuccess{200, "Images get success.", imgs}
 	i.ServeJSON()
 }
 
