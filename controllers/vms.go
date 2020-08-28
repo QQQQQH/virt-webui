@@ -36,6 +36,8 @@ func (v *VMController) GetAll() {
 	vmList, err := (*virtClient).VirtualMachine(*namespace).List(&k8smetav1.ListOptions{})
 	if err != nil {
 		log.Fatalf("cannot obtain KubeVirt vmi list: %v\n", err)
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to list VMs. " + err.Error()}
 		v.ServeJSON()
 		return
 	}
@@ -119,7 +121,8 @@ func (v *VMController) Start() {
 	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " start success."}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to start " + vmName + "."}
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to start " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -145,7 +148,8 @@ func (v *VMController) Stop() {
 	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " stop success."}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + vmName + "."}
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -203,7 +207,8 @@ func (v *VMController) Put() {
 	if err == nil {
 		v.Data["json"] = JsonResponseRenameSuccess{200, "Rename " + vmName + " to " + newName + " success.", newName}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to rename " + vmName + " to " + newName + "."}
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to rename " + vmName + " to " + newName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -234,7 +239,7 @@ func (v *VMController) Delete() {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " delete success."}
 	} else {
 		v.Ctx.Output.SetStatus(500)
-		v.Data["json"] = JsonResponseBasic{500, "Failed to delete " + vmName + "."}
+		v.Data["json"] = JsonResponseBasic{500, "Failed to delete " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }

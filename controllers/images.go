@@ -103,6 +103,8 @@ func (i *ImageController) GetAll() {
 
 	if err != nil {
 		log.Fatalf("cannot obtain KubeVirt image list: %v\n", err)
+		i.Ctx.Output.SetStatus(500)
+		i.Data["json"] = JsonResponseBasic{500, "Failed to list images. " + err.Error()}
 		i.ServeJSON()
 		return
 	}
@@ -112,7 +114,7 @@ func (i *ImageController) GetAll() {
 		imgs = append(imgs, models.Image{img.Name})
 	}
 
-	i.Data["json"] = JsonResponseListImageSuccess{200, "Images get success.", imgs}
+	i.Data["json"] = JsonResponseListImageSuccess{200, "Images list success.", imgs}
 	i.ServeJSON()
 }
 
@@ -143,9 +145,10 @@ func (i *ImageController) Post() {
 	err := imageupload.UploadImage(insecure, uploadProxyUrl, name, size, imagePath, accessMode, uploadPodWaitSecs)
 
 	if err == nil {
-		i.Data["json"] = JsonResponseUploadImageSuccess{200, name + " upload success.", JsonRequestUploadImage{name, imagePath}}
-
+		i.Data["json"] = JsonResponseUploadImageSuccess{200, name + " upload success.",
+			JsonRequestUploadImage{name, imagePath}}
 	} else {
+		i.Ctx.Output.SetStatus(500)
 		i.Data["json"] = JsonResponseBasic{500, "Failed to upload " + name + ". " + err.Error()}
 	}
 	i.ServeJSON()
@@ -162,25 +165,46 @@ type JsonResponseUploadImageSuccess struct {
 	Image      JsonRequestUploadImage
 }
 
-// @Title Rename Image
-// @Description Rename an exist image.
-// @Param	ImageName	path 	string	true		"The image you want to rename"
-// @Param	body	body	controllers.JsonRequestRename	true	"The new name"
-// @Success 200 {object} controllers.JsonResponseRenameSuccess
-// @Failure 500 Failed to rename image.
-// @router /:ImageName [put]
-func (i *ImageController) Put() {
-	imageName := i.Ctx.Input.Param(":ImageName")
-	var jsonReq JsonRequestRename
-	json.Unmarshal(i.Ctx.Input.RequestBody, &jsonReq)
-	newName := jsonReq.NewName
-	if imageName == "1" {
-		i.Data["json"] = JsonResponseRenameSuccess{200, "Rename " + imageName + " to " + newName + " success.", newName}
-	} else {
-		i.Data["json"] = JsonResponseBasic{500, "Failed to rename " + imageName + " to " + newName + "."}
-	}
-	i.ServeJSON()
-}
+// // @Title Rename Image
+// // @Description Rename an exist image.
+// // @Param	ImageName	path 	string	true		"The image you want to rename"
+// // @Param	body	body	controllers.JsonRequestRename	true	"The new name"
+// // @Success 200 {object} controllers.JsonResponseRenameSuccess
+// // @Failure 500 Failed to rename image.
+// // @router /:ImageName [put]
+// func (i *ImageController) Put() {
+// 	ok, namespace, virtClient := GetVirtClient()
+// 	if !ok {
+// 		i.ResponseNotAvaliable()
+// 		return
+// 	}
+
+// 	imgName := i.Ctx.Input.Param(":ImageName")
+// 	var jsonReq JsonRequestRename
+// 	json.Unmarshal(i.Ctx.Input.RequestBody, &jsonReq)
+// 	newName := jsonReq.NewName
+
+// 	img, err := (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Get(imgName, k8smetav1.GetOptions{})
+
+// 	if err == nil {
+// 		newImg := img.DeepCopy()
+// 		newImg.SetName(newName)
+// 		err = (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Delete(imgName, &k8smetav1.DeleteOptions{})
+// 		if err == nil {
+// 			_, err = (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Create(newImg)
+// 			if err == nil {
+// 				i.Data["json"] = JsonResponseRenameSuccess{200, "Rename " + imgName + " to " + newName + " success.", newName}
+// 			} else {
+// 				fmt.Printf("%s\n", err)
+// 			}
+// 		}
+// 	}
+// 	if err != nil {
+//		i.Ctx.Output.SetStatus(500)
+// 		i.Data["json"] = JsonResponseBasic{500, "Failed to rename " + imgName + " to " + newName + ". " + err.Error()}
+// 	}
+// 	i.ServeJSON()
+// }
 
 type JsonRequestRename struct {
 	NewName string
@@ -199,11 +223,20 @@ type JsonResponseRenameSuccess struct {
 // @Failure 500 Failed to delete image.
 // @router /:ImageName [delete]
 func (i *ImageController) Delete() {
-	imageName := i.Ctx.Input.Param(":ImageName")
-	if imageName == "1" {
-		i.Data["json"] = JsonResponseBasic{200, imageName + " delete success."}
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		i.ResponseNotAvaliable()
+		return
+	}
+
+	imgName := i.Ctx.Input.Param(":ImageName")
+	err := (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Delete(imgName, &k8smetav1.DeleteOptions{})
+
+	if err == nil {
+		i.Data["json"] = JsonResponseBasic{200, imgName + " delete success."}
 	} else {
-		i.Data["json"] = JsonResponseBasic{500, "Failed to delete " + imageName + "."}
+		i.Ctx.Output.SetStatus(500)
+		i.Data["json"] = JsonResponseBasic{500, "Failed to delete " + imgName + ". " + err.Error()}
 	}
 	i.ServeJSON()
 }
