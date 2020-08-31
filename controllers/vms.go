@@ -46,18 +46,22 @@ func (v *VMController) GetAll() {
 	var vms []models.VM
 	for _, vm := range vmList.Items {
 		var size int
+		var ready, ip string
 		if vm.Spec.Template.Spec.Domain.CPU.Cores == 1 {
 			size = 0
 		} else {
 			size = 1
 		}
-		var ready string
 		if vm.Status.Ready {
 			ready = "Ready"
+			vmi, err := (*virtClient).VirtualMachineInstance(*namespace).Get(vm.Name, &k8smetav1.GetOptions{})
+			if err == nil && len(vmi.Status.Interfaces) > 0 {
+				ip = vmi.Status.Interfaces[0].IP
+			}
 		} else {
 			ready = "Not Ready"
 		}
-		vms = append(vms, models.VM{vm.Name, vm.Namespace, size, ready})
+		vms = append(vms, models.VM{Name: vm.Name, Namespace: vm.Namespace, IP: ip, Size: size, Status: ready})
 	}
 	v.Data["json"] = JsonResponseListVMSuccess{200, "VMs list success.", vms}
 	v.ServeJSON()
@@ -87,19 +91,37 @@ func (v *VMController) Get() {
 
 	if err == nil {
 		var size int
+		var ready, ip, img string
 		if vm.Spec.Template.Spec.Domain.CPU.Cores == 1 {
 			size = 0
 		} else {
 			size = 1
 		}
-		var ready string
 		if vm.Status.Ready {
 			ready = "Ready"
+			vmi, err := (*virtClient).VirtualMachineInstance(*namespace).Get(vm.Name, &k8smetav1.GetOptions{})
+			if err == nil {
+				if len(vmi.Status.Interfaces) > 0 {
+					ip = vmi.Status.Interfaces[0].IP
+				}
+				if len(vmi.Spec.Volumes) > 0 {
+					img = vmi.Spec.Volumes[0].DataVolume.Name
+				}
+			}
 		} else {
 			ready = "Not Ready"
 		}
-		v.Data["json"] = JsonResponseGetVMSuccess{200, vmName + " get success.",
-			JsonResponseGetVMSuccessVMInfo{vmName, "This is image", size, ready, "This is YAML.", "This is Log."}}
+		v.Data["json"] = JsonResponseGetVMSuccess{
+			StatusCode: 200,
+			Message:    vmName + " get success.",
+			VM:         *vm,
+			Name:       vmName,
+			Namespace:  *namespace,
+			Image:      img,
+			Size:       size,
+			Status:     ready,
+			IP:         ip,
+		}
 	} else {
 		v.Ctx.Output.SetStatus(500)
 		v.Data["json"] = JsonResponseBasic{500, "Failed to get " + vmName + ". " + err.Error()}
@@ -110,16 +132,13 @@ func (v *VMController) Get() {
 type JsonResponseGetVMSuccess struct {
 	StatusCode int
 	Message    string
-	VM         JsonResponseGetVMSuccessVMInfo
-}
-
-type JsonResponseGetVMSuccessVMInfo struct {
-	Name   string
-	Image  string
-	Size   int
-	Status string
-	YAML   string
-	Log    string
+	Name       string
+	Namespace  string
+	Image      string
+	Size       int
+	Status     string
+	IP         string
+	VM         v1.VirtualMachine
 }
 
 // @Title Start VM
