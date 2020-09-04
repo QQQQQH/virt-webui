@@ -6,8 +6,9 @@ import (
 	"virt-webui/models"
 
 	"github.com/astaxie/beego"
+	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	v1 "kubevirt.io/client-go/api/v1"
 )
 
@@ -28,7 +29,7 @@ type JsonRequestVMName struct {
 func (v *VMController) GetAll() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -36,6 +37,8 @@ func (v *VMController) GetAll() {
 	vmList, err := (*virtClient).VirtualMachine(*namespace).List(&k8smetav1.ListOptions{})
 	if err != nil {
 		log.Fatalf("cannot obtain KubeVirt vmi list: %v\n", err)
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to list VMs. " + err.Error()}
 		v.ServeJSON()
 		return
 	}
@@ -43,18 +46,22 @@ func (v *VMController) GetAll() {
 	var vms []models.VM
 	for _, vm := range vmList.Items {
 		var size int
+		var ready, ip string
 		if vm.Spec.Template.Spec.Domain.CPU.Cores == 1 {
 			size = 0
 		} else {
 			size = 1
 		}
-		var ready string
 		if vm.Status.Ready {
 			ready = "Ready"
+			vmi, err := (*virtClient).VirtualMachineInstance(*namespace).Get(vm.Name, &k8smetav1.GetOptions{})
+			if err == nil && len(vmi.Status.Interfaces) > 0 {
+				ip = vmi.Status.Interfaces[0].IP
+			}
 		} else {
 			ready = "Not Ready"
 		}
-		vms = append(vms, models.VM{vm.Name, vm.Namespace, size, ready})
+		vms = append(vms, models.VM{Name: vm.Name, Namespace: vm.Namespace, IP: ip, Size: size, Status: ready})
 	}
 	v.Data["json"] = JsonResponseListVMSuccess{200, "VMs list success.", vms}
 	v.ServeJSON()
@@ -73,12 +80,51 @@ type JsonResponseListVMSuccess struct {
 // @Failure 500 Failed to get VM.
 // @router /:VMName [get]
 func (v *VMController) Get() {
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		v.ResponseNotAvaliable()
+		return
+	}
+
 	vmName := v.Ctx.Input.Param(":VMName")
-	if vmName == "1" {
-		v.Data["json"] = JsonResponseGetVMSuccess{200, vmName + " get success.",
-			JsonResponseGetVMSuccessVMInfo{vmName, "image1", 0, "Running", "This is YAML.", "This is Log."}}
+	vm, err := (*virtClient).VirtualMachine(*namespace).Get(vmName, &k8smetav1.GetOptions{})
+
+	if err == nil {
+		var size int
+		var ready, ip, img string
+		if vm.Spec.Template.Spec.Domain.CPU.Cores == 1 {
+			size = 0
+		} else {
+			size = 1
+		}
+		if vm.Status.Ready {
+			ready = "Ready"
+			vmi, err := (*virtClient).VirtualMachineInstance(*namespace).Get(vm.Name, &k8smetav1.GetOptions{})
+			if err == nil {
+				if len(vmi.Status.Interfaces) > 0 {
+					ip = vmi.Status.Interfaces[0].IP
+				}
+				if len(vmi.Spec.Volumes) > 0 {
+					img = vmi.Spec.Volumes[0].DataVolume.Name
+				}
+			}
+		} else {
+			ready = "Not Ready"
+		}
+		v.Data["json"] = JsonResponseGetVMSuccess{
+			StatusCode: 200,
+			Message:    vmName + " get success.",
+			VM:         *vm,
+			Name:       vmName,
+			Namespace:  *namespace,
+			Image:      img,
+			Size:       size,
+			Status:     ready,
+			IP:         ip,
+		}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to get " + vmName + "."}
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to get " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -86,16 +132,13 @@ func (v *VMController) Get() {
 type JsonResponseGetVMSuccess struct {
 	StatusCode int
 	Message    string
-	VM         JsonResponseGetVMSuccessVMInfo
-}
-
-type JsonResponseGetVMSuccessVMInfo struct {
-	Name   string
-	Image  string
-	Size   int
-	Status string
-	YAML   string
-	Log    string
+	Name       string
+	Namespace  string
+	Image      string
+	Size       int
+	Status     string
+	IP         string
+	VM         v1.VirtualMachine
 }
 
 // @Title Start VM
@@ -107,7 +150,7 @@ type JsonResponseGetVMSuccessVMInfo struct {
 func (v *VMController) Start() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -119,7 +162,8 @@ func (v *VMController) Start() {
 	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " start success."}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to start " + vmName + "."}
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to start " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -133,7 +177,7 @@ func (v *VMController) Start() {
 func (v *VMController) Stop() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -145,7 +189,8 @@ func (v *VMController) Stop() {
 	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " stop success."}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + vmName + "."}
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to stop " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -157,13 +202,151 @@ func (v *VMController) Stop() {
 // @Failure 500 Failed to create VM.
 // @router / [POST]
 func (v *VMController) Create() {
+	// ok, namespace, dynamicClient := GetDynamicClient()
+	// if !ok {
+	// 	v.ResponseNotAvaliable()
+	// 	return
+	// }
+
+	// vmRes := schema.GroupVersionResource{Group: "kubevirt.io",
+	// 	Version: "v1alpha3", Resource: "virtualmachines"}
+
+	// vm := &unstructured.Unstructured{
+	// 	Object: map[string]interface{}{
+	// 		"apiVersion": "kubevirt.io/v1alpha3",
+	// 		"kind":       "VirtualMachine",
+	// 		"metadata": map[string]interface{}{
+	// 			"name": vmName,
+	// 		},
+	// 		"spec": map[string]interface{}{
+	// 			"running": false,
+	// 			"template": map[string]interface{}{
+	// 				"metadata": map[string]interface{}{
+	// 					"labels": map[string]interface{}{
+	// 						"kubevirt.io/domain": vmName,
+	// 					},
+	// 				},
+	// 				"spec": map[string]interface{}{
+	// 					"domain": map[string]interface{}{
+	// 						"cpu": map[string]interface{}{
+	// 							"cores": cpu,
+	// 						},
+	// 						"devices": map[string]interface{}{
+	// 							"disks": []map[string]interface{}{
+	// 								{
+	// 									"disk": map[string]interface{}{
+	// 										"bus": "virtio",
+	// 									},
+	// 									"name": "dvdisk",
+	// 								},
+	// 							},
+	// 						},
+	// 						"resources": map[string]interface{}{
+	// 							"requests": map[string]interface{}{
+	// 								"memory": memory,
+	// 							},
+	// 						},
+	// 					},
+	// 					"volumes": []map[string]interface{}{
+	// 						{
+	// 							"name": "dvdisk",
+	// 							"dataVolume": map[string]interface{}{
+	// 								"name": image,
+	// 							},
+	// 						},
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }
+
+	// _, err := (*dynamicClient).Resource(vmRes).Namespace(*namespace).Create(vm, k8smetav1.CreateOptions{})
+
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		v.ResponseNotAvaliable()
+		return
+	}
+
 	var jsonReq JsonRequestCreateVM
 	json.Unmarshal(v.Ctx.Input.RequestBody, &jsonReq)
-	if jsonReq.Name == "1" {
-		v.Data["json"] = JsonResponseCreateVM{200, jsonReq.Name + " create success.",
-			JsonRequestCreateVM{jsonReq.Name, jsonReq.Image, jsonReq.Size}}
+	vmName := jsonReq.Name
+	image := jsonReq.Image
+	size := jsonReq.Size
+	running := false
+	var cpu uint32
+	var memory string
+	if size == 0 {
+		cpu = 1
+		memory = "1G"
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to create " + jsonReq.Name + "."}
+		cpu = 2
+		memory = "2G"
+	}
+
+	vm := v1.VirtualMachine{
+		TypeMeta: k8smetav1.TypeMeta{
+			Kind:       "virtualMachine",
+			APIVersion: "kubevirt.io/v1alpha3",
+		},
+		ObjectMeta: k8smetav1.ObjectMeta{
+			Name: vmName,
+		},
+		Spec: v1.VirtualMachineSpec{
+			Running: &running,
+			Template: &v1.VirtualMachineInstanceTemplateSpec{
+				ObjectMeta: k8smetav1.ObjectMeta{
+					Labels: map[string]string{
+						"kubevirt.io/domain": vmName,
+					},
+				},
+				Spec: v1.VirtualMachineInstanceSpec{
+					Domain: v1.DomainSpec{
+						CPU: &v1.CPU{
+							Cores: cpu,
+						},
+						Devices: v1.Devices{
+							Disks: []v1.Disk{
+								{
+									Name: "dvdisk",
+									DiskDevice: v1.DiskDevice{
+										Disk: &v1.DiskTarget{
+											Bus: "virtio",
+										},
+									},
+								},
+							},
+						},
+						Resources: v1.ResourceRequirements{
+							Requests: k8sv1.ResourceList{
+								"memory": resource.MustParse(memory),
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "dvdisk",
+							VolumeSource: v1.VolumeSource{
+								DataVolume: &v1.DataVolumeSource{
+									image,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := (*virtClient).VirtualMachine(*namespace).Create(&vm)
+
+	if err == nil {
+		v.Data["json"] = JsonResponseCreateVM{200, vmName + " create success.",
+			JsonRequestCreateVM{vmName, image, size}}
+	} else {
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to create " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -190,7 +373,7 @@ type JsonResponseCreateVM struct {
 func (v *VMController) Put() {
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
@@ -203,7 +386,8 @@ func (v *VMController) Put() {
 	if err == nil {
 		v.Data["json"] = JsonResponseRenameSuccess{200, "Rename " + vmName + " to " + newName + " success.", newName}
 	} else {
-		v.Data["json"] = JsonResponseBasic{500, "Failed to rename " + vmName + " to " + newName + "."}
+		v.Ctx.Output.SetStatus(500)
+		v.Data["json"] = JsonResponseBasic{500, "Failed to rename " + vmName + " to " + newName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }
@@ -215,26 +399,21 @@ func (v *VMController) Put() {
 // @Failure 500 Failed to delete VM.
 // @router /:VMName [delete]
 func (v *VMController) Delete() {
-	ok, namespace, dynamicClient := GetDynamicClient()
+	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
-		ResponseNotAvaliable(v)
+		v.ResponseNotAvaliable()
 		return
 	}
 
 	vmName := v.Ctx.Input.Param(":VMName")
-	vmRes := schema.GroupVersionResource{Group: "kubevirt.io",
-		Version: "v1alpha3", Resource: "virtualmachines"}
-	deletePolicy := k8smetav1.DeletePropagationForeground
-	deleteOptions := k8smetav1.DeleteOptions{
-		PropagationPolicy: &deletePolicy,
-	}
-	err := (*dynamicClient).Resource(vmRes).Namespace(*namespace).Delete(vmName, &deleteOptions)
+
+	err := (*virtClient).VirtualMachine(*namespace).Delete(vmName, &k8smetav1.DeleteOptions{})
 
 	if err == nil {
 		v.Data["json"] = JsonResponseBasic{200, vmName + " delete success."}
 	} else {
 		v.Ctx.Output.SetStatus(500)
-		v.Data["json"] = JsonResponseBasic{500, "Failed to delete " + vmName + "."}
+		v.Data["json"] = JsonResponseBasic{500, "Failed to delete " + vmName + ". " + err.Error()}
 	}
 	v.ServeJSON()
 }

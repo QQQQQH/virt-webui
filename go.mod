@@ -4,11 +4,14 @@ go 1.15
 
 require (
 	github.com/astaxie/beego v1.12.2
+	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/spf13/pflag v1.0.5
+	gopkg.in/cheggaaa/pb.v1 v1.0.28
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.1-beta.0
 	k8s.io/client-go v12.0.0+incompatible
 	kubevirt.io/client-go v0.32.0
+	kubevirt.io/containerized-data-importer v1.10.6
 )
 
 replace (

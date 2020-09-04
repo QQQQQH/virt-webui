@@ -5,17 +5,26 @@ import (
 	"flag"
 	"log"
 	"path/filepath"
+	imageupload "virt-webui/controllers/imageUpload"
 	"virt-webui/models"
 
 	"github.com/astaxie/beego"
 	"github.com/spf13/pflag"
+	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"kubevirt.io/client-go/kubecli"
 )
 
-func ResponseNotAvaliable(v *VMController) {
+func (i *ImageController) ResponseNotAvaliable() {
+	i.Data["json"] = JsonResponseBasic{500, "Not avaliable."}
+	i.ServeJSON()
+	return
+}
+
+func (v *VMController) ResponseNotAvaliable() {
 	v.Data["json"] = JsonResponseBasic{500, "Not avaliable."}
 	v.ServeJSON()
 	return
@@ -85,10 +94,27 @@ type JsonResponseBasic struct {
 // @Failure 500 Failed to list images.
 // @router / [get]
 func (i *ImageController) GetAll() {
-	var images []models.Image
-	images = append(images, models.Image{"image1"})
-	images = append(images, models.Image{"image2"})
-	i.Data["json"] = JsonResponseListImageSuccess{200, "Images get success.", images}
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		i.ResponseNotAvaliable()
+		return
+	}
+	imgList, err := (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).List(k8smetav1.ListOptions{})
+
+	if err != nil {
+		log.Fatalf("cannot obtain KubeVirt image list: %v\n", err)
+		i.Ctx.Output.SetStatus(500)
+		i.Data["json"] = JsonResponseBasic{500, "Failed to list images. " + err.Error()}
+		i.ServeJSON()
+		return
+	}
+
+	var imgs []models.Image
+	for _, img := range imgList.Items {
+		imgs = append(imgs, models.Image{img.Name})
+	}
+
+	i.Data["json"] = JsonResponseListImageSuccess{200, "Images list success.", imgs}
 	i.ServeJSON()
 }
 
@@ -107,11 +133,23 @@ type JsonResponseListImageSuccess struct {
 func (i *ImageController) Post() {
 	var jsonReq JsonRequestUploadImage
 	json.Unmarshal(i.Ctx.Input.RequestBody, &jsonReq)
-	if jsonReq.Name == "1" {
-		i.Data["json"] = JsonResponseUploadImageSuccess{200, jsonReq.Name + " upload success.", JsonRequestUploadImage{jsonReq.Name, jsonReq.FilePath}}
 
+	insecure := true
+	uploadProxyUrl := "https://192.168.39.22:31001"
+	name := jsonReq.Name
+	size := "1G"
+	imagePath := jsonReq.FilePath
+	accessMode := "ReadOnlyMany"
+	uploadPodWaitSecs := uint(240)
+
+	err := imageupload.UploadImage(insecure, uploadProxyUrl, name, size, imagePath, accessMode, uploadPodWaitSecs)
+
+	if err == nil {
+		i.Data["json"] = JsonResponseUploadImageSuccess{200, name + " upload success.",
+			JsonRequestUploadImage{name, imagePath}}
 	} else {
-		i.Data["json"] = JsonResponseBasic{500, "Failed to upload " + jsonReq.Name + "."}
+		i.Ctx.Output.SetStatus(500)
+		i.Data["json"] = JsonResponseBasic{500, "Failed to upload " + name + ". " + err.Error()}
 	}
 	i.ServeJSON()
 }
@@ -127,25 +165,46 @@ type JsonResponseUploadImageSuccess struct {
 	Image      JsonRequestUploadImage
 }
 
-// @Title Rename Image
-// @Description Rename an exist image.
-// @Param	ImageName	path 	string	true		"The image you want to rename"
-// @Param	body	body	controllers.JsonRequestRename	true	"The new name"
-// @Success 200 {object} controllers.JsonResponseRenameSuccess
-// @Failure 500 Failed to rename image.
-// @router /:ImageName [put]
-func (i *ImageController) Put() {
-	imageName := i.Ctx.Input.Param(":ImageName")
-	var jsonReq JsonRequestRename
-	json.Unmarshal(i.Ctx.Input.RequestBody, &jsonReq)
-	newName := jsonReq.NewName
-	if imageName == "1" {
-		i.Data["json"] = JsonResponseRenameSuccess{200, "Rename " + imageName + " to " + newName + " success.", newName}
-	} else {
-		i.Data["json"] = JsonResponseBasic{500, "Failed to rename " + imageName + " to " + newName + "."}
-	}
-	i.ServeJSON()
-}
+// // @Title Rename Image
+// // @Description Rename an exist image.
+// // @Param	ImageName	path 	string	true		"The image you want to rename"
+// // @Param	body	body	controllers.JsonRequestRename	true	"The new name"
+// // @Success 200 {object} controllers.JsonResponseRenameSuccess
+// // @Failure 500 Failed to rename image.
+// // @router /:ImageName [put]
+// func (i *ImageController) Put() {
+// 	ok, namespace, virtClient := GetVirtClient()
+// 	if !ok {
+// 		i.ResponseNotAvaliable()
+// 		return
+// 	}
+
+// 	imgName := i.Ctx.Input.Param(":ImageName")
+// 	var jsonReq JsonRequestRename
+// 	json.Unmarshal(i.Ctx.Input.RequestBody, &jsonReq)
+// 	newName := jsonReq.NewName
+
+// 	img, err := (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Get(imgName, k8smetav1.GetOptions{})
+
+// 	if err == nil {
+// 		newImg := img.DeepCopy()
+// 		newImg.SetName(newName)
+// 		err = (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Delete(imgName, &k8smetav1.DeleteOptions{})
+// 		if err == nil {
+// 			_, err = (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Create(newImg)
+// 			if err == nil {
+// 				i.Data["json"] = JsonResponseRenameSuccess{200, "Rename " + imgName + " to " + newName + " success.", newName}
+// 			} else {
+// 				fmt.Printf("%s\n", err)
+// 			}
+// 		}
+// 	}
+// 	if err != nil {
+//		i.Ctx.Output.SetStatus(500)
+// 		i.Data["json"] = JsonResponseBasic{500, "Failed to rename " + imgName + " to " + newName + ". " + err.Error()}
+// 	}
+// 	i.ServeJSON()
+// }
 
 type JsonRequestRename struct {
 	NewName string
@@ -164,11 +223,20 @@ type JsonResponseRenameSuccess struct {
 // @Failure 500 Failed to delete image.
 // @router /:ImageName [delete]
 func (i *ImageController) Delete() {
-	imageName := i.Ctx.Input.Param(":ImageName")
-	if imageName == "1" {
-		i.Data["json"] = JsonResponseBasic{200, imageName + " delete success."}
+	ok, namespace, virtClient := GetVirtClient()
+	if !ok {
+		i.ResponseNotAvaliable()
+		return
+	}
+
+	imgName := i.Ctx.Input.Param(":ImageName")
+	err := (*virtClient).CdiClient().CdiV1alpha1().DataVolumes(*namespace).Delete(imgName, &k8smetav1.DeleteOptions{})
+
+	if err == nil {
+		i.Data["json"] = JsonResponseBasic{200, imgName + " delete success."}
 	} else {
-		i.Data["json"] = JsonResponseBasic{500, "Failed to delete " + imageName + "."}
+		i.Ctx.Output.SetStatus(500)
+		i.Data["json"] = JsonResponseBasic{500, "Failed to delete " + imgName + ". " + err.Error()}
 	}
 	i.ServeJSON()
 }
