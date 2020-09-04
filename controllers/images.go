@@ -111,7 +111,7 @@ func (i *ImageController) GetAll() {
 
 	var imgs []models.Image
 	for _, img := range imgList.Items {
-		imgs = append(imgs, models.Image{img.Name})
+		imgs = append(imgs, models.Image{img.Name, img.Namespace})
 	}
 
 	i.Data["json"] = JsonResponseListImageSuccess{200, "Images list success.", imgs}
