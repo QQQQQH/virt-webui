@@ -35,15 +35,60 @@
                     </nav>
                 </div>
             </nav>
-            <div>
+            <div class="col-10">
                 <router-view />
             </div>
         </div>
     </div>
 
     <template id="overview_template">
-        <div>
-            overview
+        <div class="row">
+            <div class="col-4 mr-5">
+                <h3 class="mx-2 my-2">Images</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Namespce</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item,index) in imgList">
+                            <th scope="row">{{ index+1 }}</th>
+                            <td>{{ item.Name }}</td>
+                            <td>{{ item.Namespace }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-4 mr-5">
+                <h3 class="mx-2 my-2">VMs</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">NameSpace</th>
+                            <th scope="col">IP</th>
+                            <th scope="col">Size</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item,index) in vmList">
+                            <th scope="row">{{ index+1 }}</th>
+                            <td>
+                                <router-link :to="$parent.options[2].path+'/'+item.Name"> {{ item.Name }} </router-link>
+                            </td>
+                            <td>{{ item.Namespace }}</td>
+                            <td>{{ item.IP }}</td>
+                            <td>{{ item.Size }}</td>
+                            <td>{{ item.Status }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </template>
 
@@ -224,9 +269,9 @@
 
     <template id="vms_detail_template">
         <div>
-            <div>
+            <div class="mx-2 my-2">
                 <router-link to="./">Virtual Machines</router-link>
-                <span> > vm.Name</span>
+                <span> > {{vm.Name}}</span>
             </div>
             <table class="table">
                 <tbody>
