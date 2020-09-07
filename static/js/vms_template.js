@@ -28,7 +28,7 @@ const VMs_template = {
             var data = {
                 "Name": this.createVMName,
                 "Image": this.createVMImage,
-                "Size": this.createVMSize,
+                "Size": parseInt(this.createVMSize),
             }
             axios.post("/v1/vms/", data).then((res) => {
                 console.log(res)

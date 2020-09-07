@@ -5,6 +5,8 @@ const Images_template = {
             imgList: [],
             uploadName: '',
             uploadImagePath: '',
+            uploadSize: '1G',
+            uploadProxyUrl: 'https://192.168.39.22:31001',
             imgToDelete: '',
         }
     },
@@ -24,9 +26,13 @@ const Images_template = {
             console.log("upload: ")
             console.log(this.uploadName)
             console.log(this.uploadImagePath)
+            console.log(this.uploadSize)
+            console.log(this.uploadProxyUrl)
             var data = {
                 "Name": this.uploadName,
                 "FilePath": this.uploadImagePath,
+                "Size": this.uploadSize,
+                "UploadProxyUrl": this.uploadProxyUrl
             }
             axios.post("/v1/images/", data).then((res) => {
                 console.log(res)

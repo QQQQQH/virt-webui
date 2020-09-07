@@ -202,67 +202,6 @@ func (v *VMController) Stop() {
 // @Failure 500 Failed to create VM.
 // @router / [POST]
 func (v *VMController) Create() {
-	// ok, namespace, dynamicClient := GetDynamicClient()
-	// if !ok {
-	// 	v.ResponseNotAvaliable()
-	// 	return
-	// }
-
-	// vmRes := schema.GroupVersionResource{Group: "kubevirt.io",
-	// 	Version: "v1alpha3", Resource: "virtualmachines"}
-
-	// vm := &unstructured.Unstructured{
-	// 	Object: map[string]interface{}{
-	// 		"apiVersion": "kubevirt.io/v1alpha3",
-	// 		"kind":       "VirtualMachine",
-	// 		"metadata": map[string]interface{}{
-	// 			"name": vmName,
-	// 		},
-	// 		"spec": map[string]interface{}{
-	// 			"running": false,
-	// 			"template": map[string]interface{}{
-	// 				"metadata": map[string]interface{}{
-	// 					"labels": map[string]interface{}{
-	// 						"kubevirt.io/domain": vmName,
-	// 					},
-	// 				},
-	// 				"spec": map[string]interface{}{
-	// 					"domain": map[string]interface{}{
-	// 						"cpu": map[string]interface{}{
-	// 							"cores": cpu,
-	// 						},
-	// 						"devices": map[string]interface{}{
-	// 							"disks": []map[string]interface{}{
-	// 								{
-	// 									"disk": map[string]interface{}{
-	// 										"bus": "virtio",
-	// 									},
-	// 									"name": "dvdisk",
-	// 								},
-	// 							},
-	// 						},
-	// 						"resources": map[string]interface{}{
-	// 							"requests": map[string]interface{}{
-	// 								"memory": memory,
-	// 							},
-	// 						},
-	// 					},
-	// 					"volumes": []map[string]interface{}{
-	// 						{
-	// 							"name": "dvdisk",
-	// 							"dataVolume": map[string]interface{}{
-	// 								"name": image,
-	// 							},
-	// 						},
-	// 					},
-	// 				},
-	// 			},
-	// 		},
-	// 	},
-	// }
-
-	// _, err := (*dynamicClient).Resource(vmRes).Namespace(*namespace).Create(vm, k8smetav1.CreateOptions{})
-
 	ok, namespace, virtClient := GetVirtClient()
 	if !ok {
 		v.ResponseNotAvaliable()
