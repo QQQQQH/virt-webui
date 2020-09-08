@@ -164,7 +164,7 @@
                         <th scope="row">{{ index+1 }}</th>
                         <td>{{ item.Name }}</td>
                         <td>{{ item.Namespace }}</td>
-                        <td style="text-align: center;">
+                        <td>
                             <i class="fa fa-trash" style="cursor: pointer; color:cornflowerblue" data-toggle="modal" data-target="#deleteImageModal" @click="setImgToDelete(index)"></i>
                         </td>
                     </tr>
@@ -255,9 +255,8 @@
                         <td>{{ item.IP }}</td>
                         <td>{{ item.Size }}</td>
                         <td>{{ item.Status }}</td>
-                        <td style="text-align: center;">
+                        <td>
                             <i class="fa fa-trash" title="Delete" style="cursor: pointer; color:cornflowerblue" data-toggle="modal" data-target="#deleteVMModal" @click="setVMToDelete(index)"></i>
-                            <i class="fa fa-edit" title="Rename" style="cursor: pointer; color:cornflowerblue"></i>
                             <i class="fa fa-play" title="Start" style="cursor: pointer; color:cornflowerblue" @click="startVM(index)"></i>
                             <i class="fa fa-stop-circle" title="Stop" style="cursor: pointer; color:cornflowerblue" @click="stopVM(index)"></i>
                         </td>
