@@ -111,7 +111,7 @@ func (i *ImageController) GetAll() {
 
 	var imgs []models.Image
 	for _, img := range imgList.Items {
-		imgs = append(imgs, models.Image{img.Name})
+		imgs = append(imgs, models.Image{img.Name, img.Namespace})
 	}
 
 	i.Data["json"] = JsonResponseListImageSuccess{200, "Images list success.", imgs}
@@ -135,18 +135,18 @@ func (i *ImageController) Post() {
 	json.Unmarshal(i.Ctx.Input.RequestBody, &jsonReq)
 
 	insecure := true
-	uploadProxyUrl := "https://192.168.39.22:31001"
+	uploadProxyUrl := jsonReq.UploadProxyUrl
 	name := jsonReq.Name
-	size := "1G"
+	size := jsonReq.Size
 	imagePath := jsonReq.FilePath
-	accessMode := "ReadOnlyMany"
+	accessMode := "ReadWriteOnce"
 	uploadPodWaitSecs := uint(240)
 
 	err := imageupload.UploadImage(insecure, uploadProxyUrl, name, size, imagePath, accessMode, uploadPodWaitSecs)
 
 	if err == nil {
 		i.Data["json"] = JsonResponseUploadImageSuccess{200, name + " upload success.",
-			JsonRequestUploadImage{name, imagePath}}
+			JsonRequestUploadImage{name, imagePath, uploadProxyUrl, size}}
 	} else {
 		i.Ctx.Output.SetStatus(500)
 		i.Data["json"] = JsonResponseBasic{500, "Failed to upload " + name + ". " + err.Error()}
@@ -155,8 +155,10 @@ func (i *ImageController) Post() {
 }
 
 type JsonRequestUploadImage struct {
-	Name     string
-	FilePath string
+	Name           string
+	FilePath       string
+	UploadProxyUrl string
+	Size           string
 }
 
 type JsonResponseUploadImageSuccess struct {

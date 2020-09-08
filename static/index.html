@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Overview</title>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.14.0/css/all.css" integrity="sha384-HzLeBuhoNPvSl5KYnjx0BT+WB0QEEqLprO+NBkkk5gbc67FTaL7XIGa2w1L0Xbgc" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <script src="js/images_template.js"></script>
+    <script src="js/vms_template.js"></script>
+    <script src="js/overview.js"></script>
+    <script src="js/vms_detail_template.js"></script>
+</head>
+
+<body>
+    <nav class="navbar navbar-dark sticky-top bg-dark flex-nowrap p-0">
+        <a class="navbar-brand pl-3" href="#">Virt-Webui</a>
+    </nav>
+
+    <div class="container-fluid">
+        <div id="main_area" class="row">
+            <nav class="col-2 mt-2 pl-0 ">
+                <div id="sidebar">
+                    <nav class="nav-pills">
+                        <router-link class="nav-item nav-link" v-for="(item,index) in options" @click.native="selectOption(index)" :to="item.path" :class={active:index==activeOption}>
+                            {{item.name}}
+                        </router-link>
+                    </nav>
+                </div>
+            </nav>
+            <div class="col-10">
+                <router-view />
+            </div>
+        </div>
+    </div>
+
+    <template id="overview_template">
+        <div class="row">
+            <div class="col-4 mr-5">
+                <h3 class="mx-2 my-2">Images</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Namespce</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item,index) in imgList">
+                            <th scope="row">{{ index+1 }}</th>
+                            <td>{{ item.Name }}</td>
+                            <td>{{ item.Namespace }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-4 mr-5">
+                <h3 class="mx-2 my-2">VMs</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">NameSpace</th>
+                            <th scope="col">IP</th>
+                            <th scope="col">Size</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item,index) in vmList">
+                            <th scope="row">{{ index+1 }}</th>
+                            <td>
+                                <router-link :to="$parent.options[2].path+'/'+item.Name"> {{ item.Name }} </router-link>
+                            </td>
+                            <td>{{ item.Namespace }}</td>
+                            <td>{{ item.IP }}</td>
+                            <td>{{ item.Size }}</td>
+                            <td>{{ item.Status }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+
+    <template id="images_template">
+        <div>
+            <button type="button" class="btn btn-primary my-3" data-toggle="modal" data-target="#uploadImageModal">Upload Image</button>
+
+            <div class="modal fade" id="uploadImageModal" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="uploadImageModalLabel">Upload Image</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cancle">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <form>
+                                <div class="form-group">
+                                    <label for="upload_name" class="col-form-label">Name</label>
+                                    <input type="text" class="form-control" id="upload_name" v-model="uploadName">
+                                </div>
+                                <div class="form-group">
+                                    <label for="upload_image_path" class="col-form-label">Image Path</label>
+                                    <input type="text" class="form-control" id="upload_image_path" v-model="uploadImagePath">
+                                </div>
+                                <div class="form-group">
+                                    <label for="upload_size" class="col-form-label">Size</label>
+                                    <input type="text" class="form-control" id="upload_size" v-model="uploadSize">
+                                </div>
+                                <div class="form-group">
+                                    <label for="upload_proxy_url" class="col-form-label">Upload Proxy Url</label>
+                                    <input type="text" class="form-control" id="upload_proxy_url" v-model="uploadProxyUrl">
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancle</button>
+                            <button type="button" class="btn btn-primary" data-dismiss="modal" @click="uploadImage">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="deleteImageModal" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deleteImageModalLabel">Are you sure to delete {{ imgToDelete }}?</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cancle">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancle</button>
+                            <button type="button" class="btn btn-danger" data-dismiss="modal" @click="deleteImage">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Namespce</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(item,index) in imgList">
+                        <th scope="row">{{ index+1 }}</th>
+                        <td>{{ item.Name }}</td>
+                        <td>{{ item.Namespace }}</td>
+                        <td>
+                            <i class="fa fa-trash" style="cursor: pointer; color:cornflowerblue" data-toggle="modal" data-target="#deleteImageModal" @click="setImgToDelete(index)"></i>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </template>
+
+    <template id="vms_template">
+        <div>
+            <button type="button" class="btn btn-primary my-3" data-toggle="modal" data-target="#createVMModal">Create VM</button>
+
+            <div class="modal fade" id="createVMModal" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="CreateVMModalLabel">Create Virtual Machine</h5>
+                            <button type="button" class="close" data-dismiss="modal">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <form>
+                                <div class="form-group">
+                                    <label for="create_vm_name" class="col-form-label">Name</label>
+                                    <input type="text" class="form-control" id="create_vm_name" v-model="createVMName">
+                                </div>
+                                <div class="form-group">
+                                    <label for="create_vm_image" class="col-form-label">Image</label>
+                                    <input type="text" class="form-control" id="create_vm_image" v-model="createVMImage">
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="radio" value="0" v-model="createVMSize">
+                                        1cpu + 1G
+                                    </label>
+                                    <label>
+                                        <input type="radio" value="1" v-model="createVMSize">
+                                        2cpu + 2G
+                                    </label>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancle</button>
+                            <button type="button" class="btn btn-primary" data-dismiss="modal" @click="createVM">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="deleteVMModal" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deleteVMModalLabel">Are you sure to delete {{ vmToDelete }}?</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Cancle">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancle</button>
+                            <button type="button" class="btn btn-danger" data-dismiss="modal" @click="deleteVM">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">NameSpace</th>
+                        <th scope="col">IP</th>
+                        <th scope="col">Size</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(item,index) in vmList">
+                        <th scope="row">{{ index+1 }}</th>
+                        <td>
+                            <router-link :to="$parent.options[2].path+'/'+item.Name"> {{ item.Name }} </router-link>
+                        </td>
+                        <td>{{ item.Namespace }}</td>
+                        <td>{{ item.IP }}</td>
+                        <td>{{ item.Size }}</td>
+                        <td>{{ item.Status }}</td>
+                        <td>
+                            <i class="fa fa-trash" title="Delete" style="cursor: pointer; color:cornflowerblue" data-toggle="modal" data-target="#deleteVMModal" @click="setVMToDelete(index)"></i>
+                            <i class="fa fa-play" title="Start" style="cursor: pointer; color:cornflowerblue" @click="startVM(index)"></i>
+                            <i class="fa fa-stop-circle" title="Stop" style="cursor: pointer; color:cornflowerblue" @click="stopVM(index)"></i>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </template>
+
+    <template id="vms_detail_template">
+        <div>
+            <div class="mx-2 my-2">
+                <router-link to="./">Virtual Machines</router-link>
+                <span> > {{vm.Name}}</span>
+            </div>
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th scope="row">Name</th>
+                        <td>{{ vm.Name }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Namespace</th>
+                        <td>{{ vm.Namespace }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Image</th>
+                        <td>{{ vm.Image }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Size</th>
+                        <td>{{ vm.Size }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Status</th>
+                        <td>{{ vm.Status }}</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">IP</th>
+                        <td>{{ vm.IP }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </template>
+
+    <script>
+        const Menu_options = [{
+            name: "Overview",
+            path: "/overview",
+        }, {
+            name: "Images",
+            path: "/images"
+        }, {
+            name: "VMs",
+            path: "/vms"
+        }]
+
+        var vue_app = new Vue({
+            el: "#main_area",
+            data: {
+                activeOption: 0,
+                options: Menu_options,
+            },
+            router: new VueRouter({
+                routes: [{
+                    path: '',
+                    component: Overview_template,
+                }, {
+                    path: Menu_options[0].path,
+                    component: Overview_template,
+                }, {
+                    path: Menu_options[1].path,
+                    component: Images_template,
+                }, {
+                    path: Menu_options[2].path,
+                    component: VMs_template,
+                }, {
+                    path: '/vms/:name',
+                    component: VMs_detail_template,
+                }]
+            }),
+            methods: {
+                selectOption: function (index) {
+                    this.activeOption = index
+                }
+            }
+        })</script>
+</body>
+
+</html>
